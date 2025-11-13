@@ -2,41 +2,55 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gestione Articoli - Barcode Scanner</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Gestione Articoli - Design Carpets</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; background:#f5f5f5; }
-    #preview { width: 100%; max-width: 400px; margin-top: 10px; }
-    #result { margin-top: 20px; font-size: 1.2em; font-weight: bold; }
-    .box { background: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+    body { font-family: Arial, sans-serif; padding: 15px; background:#f0f0f0; margin:0; }
+    h2 { text-align:center; margin-bottom:20px; }
+    .card { background:white; padding:15px; border-radius:12px; margin-bottom:15px; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+    button { width:100%; padding:12px; font-size:1.1em; border:none; border-radius:10px; margin-top:10px; background:#0077ff; color:white; }
+    button.red { background:#d73939; }
+    button.gray { background:#666; }
+    #preview video { width:100% !important; border-radius:10px; }
+    #result { font-size:1.2em; }
+    input[type="file"], input[type="text"] { width:100%; padding:10px; font-size:1em; margin-top:10px; border-radius:8px; border:1px solid #ccc; }
   </style>
 </head>
 <body>
-  <h2>Gestione Articoli - Design Carpets</h2>
+  <h2>Gestione Articoli</h2>
 
-  <div class="box">
+  <div class="card">
     <h3>Carica Articoli (.csv)</h3>
     <input type="file" id="csvInput" accept=".csv" />
+    <button class="red" onclick="clearStorage()">Cancella articoli salvati</button>
   </div>
 
-  <div class="box">
+  <div class="card">
     <h3>Scanner Codice a Barre</h3>
     <button onclick="startScanner()">Avvia Scanner</button>
-    <div id="scanner" style="display:none;">
+    <button class="gray" onclick="stopScanner()">Ferma Scanner</button>
+    <div id="scanner" style="display:none; margin-top:10px;">
       <div id="preview"></div>
     </div>
   </div>
 
-  <div id="result" class="box" style="display:none;"></div>
+  <div class="card">
+    <h3>Ricerca manuale</h3>
+    <input type="text" id="manualCode" placeholder="Inserisci codice" />
+    <button onclick="manualSearch()">Cerca</button>
+  </div>
+
+  <div id="result" class="card" style="display:none;"></div>
 
 <script>
+  let articoli = JSON.parse(localStorage.getItem("articoli")) || {};
+
   // Ricarica articoli salvati all'avvio
   window.addEventListener("load", () => {
     articoli = JSON.parse(localStorage.getItem("articoli")) || {};
   });
-  let articoli = JSON.parse(localStorage.getItem("articoli")) || {}; // dizionario { codice: prezzo }
 
   // --- CARICAMENTO CSV ---
   document.getElementById("csvInput").addEventListener("change", function (e) {
@@ -53,6 +67,15 @@
     });
   });
 
+  // --- CLEAR STORAGE ---
+  function clearStorage() {
+    if (confirm("Sei sicuro di voler cancellare tutti gli articoli salvati?")) {
+      localStorage.removeItem("articoli");
+      articoli = {};
+      alert("Articoli eliminati");
+    }
+  }
+
   // --- SCANNER BARCODE ---
   function startScanner() {
     document.getElementById("scanner").style.display = "block";
@@ -64,17 +87,32 @@
         target: document.querySelector('#preview'),
         constraints: { facingMode: "environment" }
       },
+      locator: { patchSize: "medium", halfSample: true },
+      numOfWorkers: 1,
       decoder: { readers: ["ean_reader", "code_128_reader", "upc_reader"] }
     }, function (err) {
       if (err) { alert(err); return; }
       Quagga.start();
     });
 
-    Quagga.onDetected(function (data) {
-      let code = data.codeResult.code;
-      Quagga.stop();
-      mostraArticolo(code);
-    });
+    Quagga.onDetected(onScan);
+  }
+
+  function stopScanner() {
+    try { Quagga.stop(); } catch {}
+    document.getElementById("scanner").style.display = "none";
+  }
+
+  function onScan(data) {
+    let code = data.codeResult.code;
+    stopScanner();
+    mostraArticolo(code);
+  }
+
+  // --- RICERCA MANUALE ---
+  function manualSearch() {
+    let code = document.getElementById("manualCode").value.trim();
+    if (code !== "") mostraArticolo(code);
   }
 
   // --- MOSTRA ARTICOLO ---
